@@ -38,9 +38,11 @@ Which capabilities you get depends on your plan and organization settings.
 
 ## Or start from the template (10 minutes)
 
-[template/starter.html](template/starter.html) is a working, minimal assistant: a routine with computed due dates, a "Do next" box, a records log, and an Ask Claude box. It's set up as a bike assistant as an example.
+[template/starter.html](template/starter.html) is a working, cut-down version of my car assistant: maintenance items due by miles or months (whichever comes first), an odometer, a "Do next" box, a service and repair log, and an Ask Claude box. The intervals are marked as placeholders; replace them from your owner's manual. It skips the 3D model, watch list and dent tracker. Add those later with the prompts in [prompts/01-car-assistant.md](prompts/01-car-assistant.md).
 
-![Starter template: Do next box and routine list](docs/img/starter.jpg)
+![Car starter template: Do next box with an overdue tire rotation, oil change due soon, and the odometer](docs/img/starter.jpg)
+
+*The screenshot uses example data.*
 
 **Try it locally:**
 
@@ -54,14 +56,16 @@ open claude-life-assistants/template/starter.html
 
 (On Windows or Linux, double-click the file instead.) Data saves in that browser.
 
-**Make it yours with Claude:** attach `starter.html` to a new chat and paste:
+**Make it yours with Claude:** attach `starter.html` (and a photo of your owner's manual's maintenance schedule) to a new chat and paste:
 
 ```text
-Adapt this starter into an assistant for [my bike / my plants / my dog / my home lab].
-Keep its structure: CONFIG at the top, storage that uses the Artifact database when available, computed "Do next".
-Replace CONFIG.tasks with real intervals for [subject] and tell me the source for each interval, or mark it "estimate".
-Then publish it as an Artifact with capabilities {db, sample}, with every db collection readable and writable only by editors.
+This is a starter car assistant. My car is a [year make model], currently at [odometer] miles.
+Replace CONFIG.tasks with the maintenance schedule from the attached manual pages. Set each item's source to the page it came from, or "estimate" if it isn't in the manual.
+Keep the structure: CONFIG at the top, storage that uses the Artifact database when available, computed "Do next".
+Then publish it as an Artifact with capabilities {db, sample}, with every db collection (log, done, odo) readable and writable only by editors.
 ```
+
+Not a car? Use the same file: *"Adapt this starter into an assistant for [my bike / my plants / my dog]. Swap the miles limit for whatever usage counter fits (ride hours, none) and keep everything else."*
 
 ---
 
@@ -82,7 +86,7 @@ prompts/
   02-room-assistant.md       Build prompt + weekly prompts for a room assistant
   03-wardrobe-assistant.md   Build prompt + weekly prompts for a wardrobe/stylist
 template/
-  starter.html               Minimal working assistant; works offline, lights up inside Claude
+  starter.html               Minimal working car assistant; works offline, lights up inside Claude
   sample-data/*.json         Anonymized example records showing the data shapes
 LICENSE                      MIT
 ```

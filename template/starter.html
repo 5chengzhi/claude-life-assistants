@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Starter Assistant</title>
+<title>Car Assistant Starter</title>
 <!--
-  Starter assistant: a minimal, working version of the pattern in docs/architecture.md.
+  Car assistant starter: a minimal, working version of the pattern in docs/architecture.md
+  (a small version of the car assistant described in this repo).
   - Open this file in any browser: data saves in that browser (localStorage).
   - Publish it as a Claude Artifact with capabilities {db:{}, sample:{}}: data saves in the
     Artifact database (Claude can read/write it from chat) and the "Ask Claude" box turns on.
-  To make it yours, edit CONFIG below, or ask Claude: "Adapt this starter into a [bike] assistant: ..."
+  To make it yours, edit CONFIG below with the intervals from YOUR owner's manual.
+  To use it for something else (bike, plants, a pet), ask Claude to adapt it; see README.md.
 -->
 <style>
 :root{--bg:#f2f3f1;--surface:#fff;--ink:#1c2320;--muted:#5d6763;--line:#d4d9d5;--accent:#2c5c49;--accent-ink:#fff;
@@ -22,25 +24,28 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5}
 .wrap{max-width:860px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
 h1{font-size:26px;margin:0}h2{font-size:15px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+h3{font-size:14px;margin:6px 0 0}
 .sub{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:600;font-size:14px;padding:10px 12px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.panel{display:flex;flex-direction:column;gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .next{border:2px solid var(--accent)}
 .row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
-.row:first-of-type{border-top:0}
+.row:first-child{border-top:0}
 .dot{width:10px;height:10px;border-radius:50%}.ok{background:var(--ok)}.soon{background:var(--soon)}.over{background:var(--over)}.none{background:var(--line)}
 .row small{display:block;color:var(--muted);font-size:13px}
 button.act{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
-button.ghost{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
+button.ghost{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
 form.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
-input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
 .wide{grid-column:1/-1}
-.empty{color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:14px}
+.empty{color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:14px;margin:0}
+.msg{font-size:13px;color:var(--over);min-height:0}
 .answer{white-space:pre-wrap}
-:is(button,input,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(button,input,textarea,select):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -53,20 +58,41 @@ input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px sol
     <button role="tab" data-tab="ask" aria-selected="false">Ask</button>
   </nav>
 
-  <section id="tab-today" class="card next" role="tabpanel">
-    <h2>Do next</h2><div id="next"></div>
-  </section>
-  <section id="tab-today2" class="card" role="tabpanel">
-    <h2>Routine</h2><div id="tasks"></div>
-  </section>
+  <div id="tab-today" class="panel" role="tabpanel">
+    <section class="card next"><h2>Do next</h2><div id="next"></div></section>
+
+    <section class="card">
+      <h2>Odometer</h2>
+      <form class="grid" id="odoform" autocomplete="off">
+        <label>Current reading (mi)<input id="o-mi" type="number" min="0" step="1" inputmode="numeric" required></label>
+        <div><button class="act" type="submit">Update</button></div>
+      </form>
+      <div class="sub" id="odonote"></div><div class="msg" id="odomsg"></div>
+    </section>
+
+    <section class="card">
+      <h2>Maintenance</h2>
+      <p class="sub" style="margin:0">Whichever limit comes first, miles or months. The intervals below are placeholders: replace them with your owner's manual (edit CONFIG, or ask Claude).</p>
+      <div id="tasks"></div>
+      <h3 id="svc">Record a service</h3>
+      <form class="grid" id="svcform" autocomplete="off">
+        <label>Item<select id="s-task" required></select></label>
+        <label>Date done<input type="date" id="s-date" required></label>
+        <label>Odometer then (mi)<input id="s-mi" type="number" min="0" step="1" inputmode="numeric" placeholder="optional"></label>
+        <div><button class="act" type="submit">Save</button></div>
+      </form>
+      <div class="sub">Use this for work done today or months ago (e.g. "oil change on Sep 18 at 113,240 mi").</div>
+    </section>
+  </div>
 
   <section id="tab-log" class="card" role="tabpanel" hidden>
     <h2>Add a record</h2>
     <form class="grid" id="logform" autocomplete="off">
       <label>Date<input type="date" id="f-date" required></label>
-      <label class="wide">What happened<input id="f-title" maxlength="120" required placeholder="e.g. Replaced chain"></label>
-      <label>Cost $ (optional)<input id="f-cost" type="number" min="0" step="0.01" inputmode="decimal"></label>
-      <label class="wide">Notes<textarea id="f-note" rows="2" maxlength="600" placeholder="What the shop said, what to watch"></textarea></label>
+      <label class="wide">What happened<input id="f-title" maxlength="120" required placeholder="e.g. Check-engine light came on; shop found loose gas cap"></label>
+      <label>Odometer (mi)<input id="f-mi" type="number" min="0" step="1" inputmode="numeric" placeholder="optional"></label>
+      <label>Cost $<input id="f-cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="optional"></label>
+      <label class="wide">Notes<textarea id="f-note" rows="2" maxlength="600" placeholder="What the shop said, what was quoted vs billed, what to watch"></textarea></label>
       <div><button class="act" type="submit">Save record</button></div>
     </form>
     <h2>History</h2><div id="log"></div>
@@ -75,9 +101,9 @@ input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px sol
 
   <section id="tab-ask" class="card" role="tabpanel" hidden>
     <h2>Ask Claude</h2>
-    <p class="sub" id="asknote">Claude sees your routine and records for this one question. It has no memory between questions.</p>
+    <p class="sub" id="asknote">Claude sees your odometer, maintenance status and records for this one question. It has no memory between questions.</p>
     <form id="askform" autocomplete="off" style="display:flex;flex-direction:column;gap:8px">
-      <textarea id="q" rows="3" maxlength="800" placeholder="e.g. What should I do this weekend, and why?"></textarea>
+      <textarea id="q" rows="3" maxlength="800" placeholder="e.g. I'm driving 600 miles next weekend. What should I check or do first?"></textarea>
       <div><button class="act" type="submit" id="askbtn">Ask</button></div>
     </form>
     <div class="answer" id="answer" aria-live="polite"></div>
@@ -87,18 +113,22 @@ input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px sol
 <script>
 /* ===== 1. CONFIG: edit this to make it yours (reference data lives in the page) ===== */
 const CONFIG = {
-  name: "Bike Assistant",
-  subject: "my road bike",
-  // Routine tasks. everyDays is the interval; "source" says where the interval came from.
+  name: "My Car",
+  subject: "my car",            // e.g. "my 2015 Nissan Rogue", so Ask Claude knows the vehicle
+  // Each item is due at everyMi miles OR everyMo months, whichever comes first. everyMi: null = time only.
+  // source: where the interval came from. These are common placeholders, NOT your car's schedule.
   tasks: [
-    { id: "tires",  name: "Check tire pressure",        everyDays: 7,   source: "estimate" },
-    { id: "chain",  name: "Clean and lube chain",       everyDays: 14,  source: "estimate" },
-    { id: "brakes", name: "Inspect brake pads",         everyDays: 30,  source: "estimate" },
-    { id: "tuneup", name: "Shop tune-up",               everyDays: 365, source: "estimate" }
+    { id: "oil",    name: "Engine oil and filter", everyMi: 5000,  everyMo: 6,  source: "placeholder" },
+    { id: "rotate", name: "Tire rotation",         everyMi: 7500,  everyMo: 12, source: "placeholder" },
+    { id: "cabin",  name: "Cabin air filter",      everyMi: 15000, everyMo: 12, source: "placeholder" },
+    { id: "air",    name: "Engine air filter",     everyMi: 30000, everyMo: 36, source: "placeholder" },
+    { id: "brakefl",name: "Brake fluid",           everyMi: null,  everyMo: 36, source: "placeholder" },
+    { id: "wipers", name: "Wiper blades",          everyMi: null,  everyMo: 12, source: "placeholder" }
   ]
 };
 
 /* ===== 2. STORAGE: Artifact database when available, else this browser ===== */
+// Collections: "log" (free records), "done" (services: {task, date, mi}), "odo" (odometer readings: {date, mi}).
 const Store = {
   db: null,
   async init() {
@@ -125,16 +155,43 @@ const Store = {
 /* ===== 3. LOGIC: status is computed from data, never typed ===== */
 const $ = id => document.getElementById(id);
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
-const daysSince = d => Math.floor((Date.parse(today()) - Date.parse(d)) / 864e5);
-let S = { log: [], done: [] };
+const DAY = 864e5;
+const fmt = n => Number(n).toLocaleString("en-US");
+const numOrNull = v => v === "" || v == null ? null : Number(v);
+const addMonths = (date, n) => { const [y, m, d] = date.split("-").map(Number); return new Date(Date.UTC(y, m - 1 + n, d)).toISOString().slice(0, 10); };
+let S = { log: [], done: [], odo: [] };
 
-function status(task) {
-  const last = S.done.filter(d => d.task === task.id).map(d => d.date).sort().pop();
-  if (!last) return { st: "none", text: "Never logged", frac: 2 };
-  const left = task.everyDays - daysSince(last), frac = daysSince(last) / task.everyDays;
-  return { st: frac >= 1 ? "over" : frac >= 0.85 ? "soon" : "ok", frac, last,
-    text: left < 0 ? -left + " days overdue" : left === 0 ? "due today" : "due in " + left + " days" };
+// Current odometer = highest reading anywhere (odometers only go up).
+function odometer() {
+  let best = null;
+  for (const r of [...S.odo, ...S.done, ...S.log]) if (r.mi != null && Number.isFinite(+r.mi) && (!best || +r.mi > best.mi)) best = { mi: +r.mi, date: r.date };
+  return best;
 }
+const lastDone = t => S.done.filter(d => d.task === t.id).sort((a, b) => a.date.localeCompare(b.date) || (a.mi || 0) - (b.mi || 0)).pop();
+
+function status(t) {
+  const last = lastDone(t);
+  if (!last) return { st: "none", frac: -1, text: "No service recorded yet" };
+  const parts = []; let frac = 0;
+  if (t.everyMo) {
+    const due = addMonths(last.date, t.everyMo), span = Date.parse(due) - Date.parse(last.date);
+    const dLeft = Math.round((Date.parse(due) - Date.parse(today())) / DAY);
+    frac = Math.max(frac, (Date.parse(today()) - Date.parse(last.date)) / span);
+    const days = n => n + (n === 1 ? " day" : " days");
+    parts.push(dLeft < 0 ? days(-dLeft) + " overdue" : dLeft === 0 ? "due today" : days(dLeft) + " left");
+  }
+  const cur = odometer();
+  if (t.everyMi) {
+    if (last.mi == null || !cur) parts.push("miles unknown");
+    else {
+      const used = cur.mi - last.mi, left = t.everyMi - used;
+      frac = Math.max(frac, used / t.everyMi);
+      parts.push(left < 0 ? fmt(-left) + " mi overdue" : fmt(left) + " mi left");
+    }
+  }
+  return { st: frac >= 1 ? "over" : frac >= 0.85 ? "soon" : "ok", frac, last, text: parts.join(" · ") };
+}
+const every = t => "every " + [t.everyMi ? fmt(t.everyMi) + " mi" : null, t.everyMo ? t.everyMo + " mo" : null].filter(Boolean).join(" or ");
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) k.startsWith("on") ? e.addEventListener(k.slice(2), v) : e.setAttribute(k, v);
   e.append(...kids.filter(k => k != null)); return e; };
@@ -142,47 +199,94 @@ const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag)
 /* ===== 4. RENDER ===== */
 function taskRow(t) {
   const s = status(t);
+  const lastTxt = s.last ? "last " + s.last.date + (s.last.mi != null ? " at " + fmt(s.last.mi) + " mi" : "") : "";
   return el("div", { class: "row" }, el("span", { class: "dot " + s.st }),
-    el("div", {}, t.name, el("small", {}, s.text + " · every " + t.everyDays + " days (" + t.source + ")")),
-    el("button", { class: "ghost", type: "button", onclick: () => markDone(t) }, "Done today"));
+    el("div", {}, t.name, el("small", {}, s.text + " · " + every(t) + " (" + t.source + ")" + (lastTxt ? " · " + lastTxt : ""))),
+    el("button", { class: "ghost", type: "button", onclick: () => prefillService(t) }, "Log done"));
+}
+function infoRow(text, sub) {
+  return el("div", { class: "row" }, el("span", { class: "dot none" }), el("div", {}, text, sub ? el("small", {}, sub) : null), el("span"));
+}
+function deleteButton(col, id) {
+  // Two taps to delete (no confirm() dialog: sandboxed pages may block it).
+  const b = el("button", { class: "ghost", type: "button" }, "Delete");
+  let armed = false, timer;
+  b.addEventListener("click", async () => {
+    if (!armed) { armed = true; b.textContent = "Tap again"; timer = setTimeout(() => { armed = false; b.textContent = "Delete"; }, 3000); return; }
+    clearTimeout(timer); b.disabled = true;
+    try { await Store.remove(col, id); S[col] = S[col].filter(r => r.id !== id); render(); }
+    catch (e) { b.disabled = false; b.textContent = "Couldn't delete"; }
+  });
+  return b;
 }
 function render() {
   $("title").textContent = CONFIG.name;
   $("mode").textContent = Store.db ? "Saved to this Artifact's database" : "Saved in this browser only";
-  const ranked = CONFIG.tasks.map(t => [t, status(t)]).filter(([, s]) => s.st !== "ok").sort((a, b) => b[1].frac - a[1].frac).slice(0, 3);
-  $("next").replaceChildren(...(ranked.length ? ranked.map(([t]) => taskRow(t))
-    : [el("p", { class: "empty" }, "Nothing due. You're caught up.")]));
+  const cur = odometer();
+  $("odonote").textContent = cur ? "Latest: " + fmt(cur.mi) + " mi on " + cur.date + ". Update it whenever you fill up or get service."
+    : "Not set yet. Mileage-based items can't be checked until you enter it.";
+
+  // Do next: missing odometer, then overdue/soon by urgency, then setup reminder. Max 3.
+  const next = [];
+  if (!cur) next.push(infoRow("Enter your current odometer", "Below, under Odometer."));
+  CONFIG.tasks.map(t => [t, status(t)]).filter(([, s]) => s.st === "over" || s.st === "soon")
+    .sort((a, b) => b[1].frac - a[1].frac).forEach(([t]) => next.push(taskRow(t)));
+  const unset = CONFIG.tasks.filter(t => !lastDone(t)).length;
+  if (unset) next.push(infoRow(unset + " of " + CONFIG.tasks.length + " items have no service recorded",
+    "Add when each was last done under Record a service (a receipt or your service history has the dates)."));
+  $("next").replaceChildren(...(next.length ? next.slice(0, 3) : [el("p", { class: "empty" }, "Nothing due. You're caught up.")]));
   $("tasks").replaceChildren(...CONFIG.tasks.map(taskRow));
-  const log = [...S.log].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  $("log").replaceChildren(...(log.length ? log.map(r => el("div", { class: "row" }, el("span", { class: "dot none" }),
-      el("div", {}, r.date + " · " + r.title, r.note ? el("small", {}, r.note) : null),
-      el("span", { class: "sub" }, r.cost != null ? "$" + Number(r.cost).toFixed(2) : "")))
+
+  const hist = [
+    ...S.log.map(r => ({ col: "log", r, title: r.title, note: r.note, cost: r.cost })),
+    ...S.done.map(r => ({ col: "done", r, title: (CONFIG.tasks.find(t => t.id === r.task) || { name: r.task }).name + " (service)" }))
+  ].sort((a, b) => (b.r.date || "").localeCompare(a.r.date || ""));
+  $("log").replaceChildren(...(hist.length ? hist.map(h => el("div", { class: "row" }, el("span", { class: "dot none" }),
+      el("div", {}, h.r.date + " · " + h.title,
+        el("small", {}, [h.r.mi != null ? fmt(h.r.mi) + " mi" : null, h.cost != null ? "$" + Number(h.cost).toFixed(2) : null, h.note || null].filter(Boolean).join(" · ") || null)),
+      deleteButton(h.col, h.r.id)))
     : [el("p", { class: "empty" }, "No records yet. Add one above, or send Claude a photo of a receipt and ask it to log it here.")]));
   $("export").hidden = !!Store.db;
 }
 
 /* ===== 5. ACTIONS ===== */
-async function markDone(t) {
-  const row = { task: t.id, date: today() };
-  await Store.put("done", t.id + "-" + row.date, row);
-  S.done.push({ id: t.id + "-" + row.date, ...row }); render();
+function prefillService(t) {
+  $("s-task").value = t.id; $("s-date").value = today();
+  const cur = odometer(); $("s-mi").value = cur ? cur.mi : "";
+  $("svc").scrollIntoView({ behavior: "smooth", block: "start" }); $("s-mi").focus({ preventScroll: true });
 }
+$("svcform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const row = { task: $("s-task").value, date: $("s-date").value, mi: numOrNull($("s-mi").value) };
+  const id = row.task + "-" + row.date;
+  await Store.put("done", id, row); S.done = S.done.filter(r => r.id !== id).concat({ id, ...row });
+  $("s-mi").value = ""; render();
+});
+$("odoform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const mi = Number($("o-mi").value), cur = odometer();
+  if (cur && mi < cur.mi) { $("odomsg").textContent = "That's lower than an earlier reading (" + fmt(cur.mi) + " mi). Check the number."; return; }
+  $("odomsg").textContent = "";
+  const row = { date: today(), mi }, id = row.date;
+  await Store.put("odo", id, row); S.odo = S.odo.filter(r => r.id !== id).concat({ id, ...row });
+  e.target.reset(); render();
+});
 $("logform").addEventListener("submit", async e => {
   e.preventDefault();
-  const cost = $("f-cost").value;
-  const row = { date: $("f-date").value, title: $("f-title").value.trim(), note: $("f-note").value.trim(), cost: cost === "" ? null : Number(cost) };
+  const row = { date: $("f-date").value, title: $("f-title").value.trim(), note: $("f-note").value.trim(),
+    mi: numOrNull($("f-mi").value), cost: numOrNull($("f-cost").value) };
   const id = row.date + "-" + Date.now().toString(36);
   await Store.put("log", id, row); S.log.push({ id, ...row });
   e.target.reset(); $("f-date").value = today(); render();
 });
 $("export").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
-  const a = el("a", { href: URL.createObjectURL(blob), download: "assistant-data.json" }); a.click();
+  const a = el("a", { href: URL.createObjectURL(blob), download: "car-assistant-data.json" }); a.click();
 });
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
   const t = b.dataset.tab;
-  $("tab-today").hidden = $("tab-today2").hidden = t !== "today"; $("tab-log").hidden = t !== "log"; $("tab-ask").hidden = t !== "ask";
+  $("tab-today").hidden = t !== "today"; $("tab-log").hidden = t !== "log"; $("tab-ask").hidden = t !== "ask";
 }));
 
 /* Ask Claude: only inside a Claude Artifact with the `sample` capability. No memory, so send everything it needs. */
@@ -190,8 +294,11 @@ let sample = null;
 $("askform").addEventListener("submit", async e => {
   e.preventDefault();
   const q = $("q").value.trim(); if (!q || !sample) return;
-  const data = { today: today(), routine: CONFIG.tasks.map(t => ({ name: t.name, everyDays: t.everyDays, ...status(t) })), records: S.log.slice(-50) };
-  const prompt = "You are a practical assistant for " + CONFIG.subject + ". Use only the data below; say when the data can't answer. " +
+  const data = { today: today(), vehicle: CONFIG.subject, odometer: odometer(),
+    maintenance: CONFIG.tasks.map(t => { const s = status(t); return { name: t.name, interval: every(t), intervalSource: t.source, status: s.st, detail: s.text, last: s.last || null }; }),
+    records: S.log.slice(-50) };
+  const prompt = "You are a practical car-maintenance assistant for " + CONFIG.subject + ". Use only the data below and general car knowledge; " +
+    "say when the data can't answer, and say when an interval is a placeholder rather than the manufacturer's. " +
     "Answer in at most 6 short lines, most important first.\n\nDATA:\n" + JSON.stringify(data) + "\n\nQUESTION: " + q;
   $("askbtn").disabled = true; $("answer").textContent = "Thinking…";
   try { const r = await sample(prompt, { cache: false, onText: ({ text }) => { $("answer").textContent = text; } }); $("answer").textContent = r.text; }
@@ -201,9 +308,10 @@ $("askform").addEventListener("submit", async e => {
 
 /* ===== 6. START ===== */
 (async () => {
-  $("f-date").value = today();
+  $("f-date").value = $("s-date").value = today();
+  $("s-task").replaceChildren(...CONFIG.tasks.map(t => el("option", { value: t.id }, t.name)));
   await Store.init();
-  try { [S.log, S.done] = await Promise.all([Store.all("log"), Store.all("done")]); } catch (e) { S = { log: [], done: [] }; }
+  try { [S.log, S.done, S.odo] = await Promise.all([Store.all("log"), Store.all("done"), Store.all("odo")]); } catch (e) { S = { log: [], done: [], odo: [] }; }
   render();
   if (window.claude && typeof claude.use === "function") { try { sample = await claude.use("sample"); } catch (e) { sample = null; } }
   if (!sample) { $("askform").hidden = true; $("asknote").textContent = "Ask Claude works when this page is published as a Claude Artifact with the sample capability."; }
