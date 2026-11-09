@@ -1,0 +1,6 @@
+[
+  {"id": "2026-10-14", "date": "2026-10-14", "mi": 113240, "shop": "Shop A", "work": "Front control arm, rear brake pads", "cost": 1324.07,
+   "said": "Front pads about 5 mm. No alignment machine here; get an alignment elsewhere."},
+  {"id": "2026-10-22", "date": "2026-10-22", "mi": 113004, "shop": "Tire shop B", "work": "Four-wheel alignment", "cost": 112.27,
+   "said": "Rear adjusters seized. Tires set to 38 psi (placard says 33 cold). Invoice mileage lower than Shop A's: verify."}
+]

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Starter Assistant</title>
+<!--
+  Starter assistant: a minimal, working version of the pattern in docs/architecture.md.
+  - Open this file in any browser: data saves in that browser (localStorage).
+  - Publish it as a Claude Artifact with capabilities {db:{}, sample:{}}: data saves in the
+    Artifact database (Claude can read/write it from chat) and the "Ask Claude" box turns on.
+  To make it yours, edit CONFIG below, or ask Claude: "Adapt this starter into a [bike] assistant: ..."
+-->
+<style>
+:root{--bg:#f2f3f1;--surface:#fff;--ink:#1c2320;--muted:#5d6763;--line:#d4d9d5;--accent:#2c5c49;--accent-ink:#fff;
+  --ok:#2f7a52;--soon:#a8721a;--over:#b4402a;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151917;--surface:#1f2522;--ink:#e7ece8;--muted:#9ba6a0;
+  --line:#343c38;--accent:#86c7a8;--accent-ink:#11201a;--ok:#7fcf9f;--soon:#e2b25c;--over:#ec8f7b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151917;--surface:#1f2522;--ink:#e7ece8;--muted:#9ba6a0;--line:#343c38;--accent:#86c7a8;
+  --accent-ink:#11201a;--ok:#7fcf9f;--soon:#e2b25c;--over:#ec8f7b;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:26px;margin:0}h2{font-size:15px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.sub{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:600;font-size:14px;padding:10px 12px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.next{border:2px solid var(--accent)}
+.row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.dot{width:10px;height:10px;border-radius:50%}.ok{background:var(--ok)}.soon{background:var(--soon)}.over{background:var(--over)}.none{background:var(--line)}
+.row small{display:block;color:var(--muted);font-size:13px}
+button.act{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+button.ghost{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
+form.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
+.wide{grid-column:1/-1}
+.empty{color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:14px}
+.answer{white-space:pre-wrap}
+:is(button,input,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1 id="title"></h1><div class="sub" id="mode">Loading…</div></header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="log" aria-selected="false">Log</button>
+    <button role="tab" data-tab="ask" aria-selected="false">Ask</button>
+  </nav>
+
+  <section id="tab-today" class="card next" role="tabpanel">
+    <h2>Do next</h2><div id="next"></div>
+  </section>
+  <section id="tab-today2" class="card" role="tabpanel">
+    <h2>Routine</h2><div id="tasks"></div>
+  </section>
+
+  <section id="tab-log" class="card" role="tabpanel" hidden>
+    <h2>Add a record</h2>
+    <form class="grid" id="logform" autocomplete="off">
+      <label>Date<input type="date" id="f-date" required></label>
+      <label class="wide">What happened<input id="f-title" maxlength="120" required placeholder="e.g. Replaced chain"></label>
+      <label>Cost $ (optional)<input id="f-cost" type="number" min="0" step="0.01" inputmode="decimal"></label>
+      <label class="wide">Notes<textarea id="f-note" rows="2" maxlength="600" placeholder="What the shop said, what to watch"></textarea></label>
+      <div><button class="act" type="submit">Save record</button></div>
+    </form>
+    <h2>History</h2><div id="log"></div>
+    <div><button class="ghost" id="export" type="button" hidden>Export my data (JSON)</button></div>
+  </section>
+
+  <section id="tab-ask" class="card" role="tabpanel" hidden>
+    <h2>Ask Claude</h2>
+    <p class="sub" id="asknote">Claude sees your routine and records for this one question. It has no memory between questions.</p>
+    <form id="askform" autocomplete="off" style="display:flex;flex-direction:column;gap:8px">
+      <textarea id="q" rows="3" maxlength="800" placeholder="e.g. What should I do this weekend, and why?"></textarea>
+      <div><button class="act" type="submit" id="askbtn">Ask</button></div>
+    </form>
+    <div class="answer" id="answer" aria-live="polite"></div>
+  </section>
+</div>
+
+<script>
+/* ===== 1. CONFIG: edit this to make it yours (reference data lives in the page) ===== */
+const CONFIG = {
+  name: "Bike Assistant",
+  subject: "my road bike",
+  // Routine tasks. everyDays is the interval; "source" says where the interval came from.
+  tasks: [
+    { id: "tires",  name: "Check tire pressure",        everyDays: 7,   source: "estimate" },
+    { id: "chain",  name: "Clean and lube chain",       everyDays: 14,  source: "estimate" },
+    { id: "brakes", name: "Inspect brake pads",         everyDays: 30,  source: "estimate" },
+    { id: "tuneup", name: "Shop tune-up",               everyDays: 365, source: "estimate" }
+  ]
+};
+
+/* ===== 2. STORAGE: Artifact database when available, else this browser ===== */
+const Store = {
+  db: null,
+  async init() {
+    if (window.claude && typeof claude.use === "function") {
+      try { this.db = await claude.use("db"); } catch (e) { this.db = null; }
+    }
+  },
+  local(col) { try { return JSON.parse(localStorage.getItem("starter:" + col) || "[]"); } catch (e) { return []; } },
+  saveLocal(col, rows) { try { localStorage.setItem("starter:" + col, JSON.stringify(rows)); } catch (e) {} },
+  async all(col) {
+    if (this.db) { const s = await this.db.collection(col).get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); }
+    return this.local(col);
+  },
+  async put(col, id, data) {
+    if (this.db) return this.db.collection(col).doc(id).set(data);
+    const rows = this.local(col).filter(r => r.id !== id); rows.push({ id, ...data }); this.saveLocal(col, rows);
+  },
+  async remove(col, id) {
+    if (this.db) return this.db.collection(col).doc(id).delete();
+    this.saveLocal(col, this.local(col).filter(r => r.id !== id));
+  }
+};
+
+/* ===== 3. LOGIC: status is computed from data, never typed ===== */
+const $ = id => document.getElementById(id);
+const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const daysSince = d => Math.floor((Date.parse(today()) - Date.parse(d)) / 864e5);
+let S = { log: [], done: [] };
+
+function status(task) {
+  const last = S.done.filter(d => d.task === task.id).map(d => d.date).sort().pop();
+  if (!last) return { st: "none", text: "Never logged", frac: 2 };
+  const left = task.everyDays - daysSince(last), frac = daysSince(last) / task.everyDays;
+  return { st: frac >= 1 ? "over" : frac >= 0.85 ? "soon" : "ok", frac, last,
+    text: left < 0 ? -left + " days overdue" : left === 0 ? "due today" : "due in " + left + " days" };
+}
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) k.startsWith("on") ? e.addEventListener(k.slice(2), v) : e.setAttribute(k, v);
+  e.append(...kids.filter(k => k != null)); return e; };
+
+/* ===== 4. RENDER ===== */
+function taskRow(t) {
+  const s = status(t);
+  return el("div", { class: "row" }, el("span", { class: "dot " + s.st }),
+    el("div", {}, t.name, el("small", {}, s.text + " · every " + t.everyDays + " days (" + t.source + ")")),
+    el("button", { class: "ghost", type: "button", onclick: () => markDone(t) }, "Done today"));
+}
+function render() {
+  $("title").textContent = CONFIG.name;
+  $("mode").textContent = Store.db ? "Saved to this Artifact's database" : "Saved in this browser only";
+  const ranked = CONFIG.tasks.map(t => [t, status(t)]).filter(([, s]) => s.st !== "ok").sort((a, b) => b[1].frac - a[1].frac).slice(0, 3);
+  $("next").replaceChildren(...(ranked.length ? ranked.map(([t]) => taskRow(t))
+    : [el("p", { class: "empty" }, "Nothing due. You're caught up.")]));
+  $("tasks").replaceChildren(...CONFIG.tasks.map(taskRow));
+  const log = [...S.log].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  $("log").replaceChildren(...(log.length ? log.map(r => el("div", { class: "row" }, el("span", { class: "dot none" }),
+      el("div", {}, r.date + " · " + r.title, r.note ? el("small", {}, r.note) : null),
+      el("span", { class: "sub" }, r.cost != null ? "$" + Number(r.cost).toFixed(2) : "")))
+    : [el("p", { class: "empty" }, "No records yet. Add one above, or send Claude a photo of a receipt and ask it to log it here.")]));
+  $("export").hidden = !!Store.db;
+}
+
+/* ===== 5. ACTIONS ===== */
+async function markDone(t) {
+  const row = { task: t.id, date: today() };
+  await Store.put("done", t.id + "-" + row.date, row);
+  S.done.push({ id: t.id + "-" + row.date, ...row }); render();
+}
+$("logform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const cost = $("f-cost").value;
+  const row = { date: $("f-date").value, title: $("f-title").value.trim(), note: $("f-note").value.trim(), cost: cost === "" ? null : Number(cost) };
+  const id = row.date + "-" + Date.now().toString(36);
+  await Store.put("log", id, row); S.log.push({ id, ...row });
+  e.target.reset(); $("f-date").value = today(); render();
+});
+$("export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: "assistant-data.json" }); a.click();
+});
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  const t = b.dataset.tab;
+  $("tab-today").hidden = $("tab-today2").hidden = t !== "today"; $("tab-log").hidden = t !== "log"; $("tab-ask").hidden = t !== "ask";
+}));
+
+/* Ask Claude: only inside a Claude Artifact with the `sample` capability. No memory, so send everything it needs. */
+let sample = null;
+$("askform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const q = $("q").value.trim(); if (!q || !sample) return;
+  const data = { today: today(), routine: CONFIG.tasks.map(t => ({ name: t.name, everyDays: t.everyDays, ...status(t) })), records: S.log.slice(-50) };
+  const prompt = "You are a practical assistant for " + CONFIG.subject + ". Use only the data below; say when the data can't answer. " +
+    "Answer in at most 6 short lines, most important first.\n\nDATA:\n" + JSON.stringify(data) + "\n\nQUESTION: " + q;
+  $("askbtn").disabled = true; $("answer").textContent = "Thinking…";
+  try { const r = await sample(prompt, { cache: false, onText: ({ text }) => { $("answer").textContent = text; } }); $("answer").textContent = r.text; }
+  catch (err) { $("answer").textContent = err && err.code === "not_granted" ? "Ask Claude isn't allowed on this page." : "Couldn't get an answer (" + ((err && err.code) || "error") + ")."; }
+  finally { $("askbtn").disabled = false; }
+});
+
+/* ===== 6. START ===== */
+(async () => {
+  $("f-date").value = today();
+  await Store.init();
+  try { [S.log, S.done] = await Promise.all([Store.all("log"), Store.all("done")]); } catch (e) { S = { log: [], done: [] }; }
+  render();
+  if (window.claude && typeof claude.use === "function") { try { sample = await claude.use("sample"); } catch (e) { sample = null; } }
+  if (!sample) { $("askform").hidden = true; $("asknote").textContent = "Ask Claude works when this page is published as a Claude Artifact with the sample capability."; }
+})();
+</script>
+</body>
+</html>

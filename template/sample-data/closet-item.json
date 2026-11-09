@@ -1,0 +1,5 @@
+[
+  {"id": "np", "name": "Black ribbed knit polo", "category": "shirt", "color": "black", "colorFamily": "black", "formality": 3,
+   "seasons": ["spring", "summer", "fall", "winter"], "texture": "rib knit", "fit": "core",
+   "brand": "Brand X", "size": "XL", "fabric": "100% cotton", "care": "Wash cold, inside out. Lay flat to dry. (inferred)"}
+]

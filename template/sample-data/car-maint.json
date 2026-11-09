@@ -1,0 +1,5 @@
+[
+  {"id": "oil", "name": "Engine oil and filter", "everyMi": 5000, "everyMo": 6, "lastMi": 113240, "lastDate": "2026-09-18",
+   "source": "Owner's manual, maintenance schedule (severe use)"},
+  {"id": "cabin", "name": "Cabin air filter", "everyMi": 15000, "everyMo": 12, "lastMi": null, "lastDate": null, "source": "Owner's manual"}
+]
